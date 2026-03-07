@@ -1,0 +1,44 @@
+name: Compile WifiX Pamungkas
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      - name: Install Spacehuhn Deauther SDK
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+          arduino-cli core install deauther:esp8266 --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+
+      - name: Install SimpleCLI
+        run: arduino-cli lib install "SimpleCLI"
+
+      - name: Fix Structure and Compile
+        run: |
+          # 1. Buat folder kerja sesuai nama file .ino
+          mkdir -p WifiXv1.5
+          cp -rp ./* WifiXv1.5/ 2>/dev/null || true
+          
+          # 2. FIX PATH LIBRARY (Ini kuncinya!)
+          # Kita buat folder 'src' di dalem folder kerja, terus copy isinya
+          # Biar kodingan lu nemu "src/ArduinoJson-v5.13.5/ArduinoJson.h"
+          mkdir -p WifiXv1.5/src
+          cp -rp src/* WifiXv1.5/src/ 2>/dev/null || true
+          
+          # 3. Compile pake Board NodeMCU (biar kenal pin D5) di SDK Spacehuhn
+          # Pake eesz=4M2M sesuai request lu
+          arduino-cli compile --fqbn deauther:esp8266:nodemcuv2:eesz=4M2M \
+            --output-dir ./build ./WifiXv1.5/WifiXv1.5.ino
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: WifiX-V1.5-Final-Binary
+          path: ./build/*.bin
