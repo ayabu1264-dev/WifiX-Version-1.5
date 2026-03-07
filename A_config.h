@@ -723,8 +723,8 @@
 
 // ======== AVAILABLE SETTINGS ========== //
 #define DEAUTHS_PER_TARGET 20
-#define AP_SSID "#WifiX.1.5#"
-#define AP_PASSWD "deauther"
+#define AP_SSID "Vivo1904"
+#define AP_PASSWD "Sangkur87"
 #define DEFAULT_LANG "en"
 /*
    // ===== ATTACK ===== //
